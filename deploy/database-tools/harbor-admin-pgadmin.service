@@ -1,0 +1,37 @@
+[Unit]
+Description=Harbor administrator pgAdmin instance
+After=network.target harbor-admin-pgadmin.socket
+Requires=harbor-admin-pgadmin.socket
+
+[Service]
+User=harbor-admin-pgadmin
+Group=harbor-admin-pgadmin
+WorkingDirectory=/usr/local/share/harbor/database-tools
+Environment=PYTHONPATH=/opt/harbor-pgadmin/lib/python3.12/site-packages/pgadmin4
+Environment=HARBOR_TOOL_SSO=1
+Environment=HARBOR_PGADMIN_ROLE=admin
+Environment=HOME=/var/lib/harbor-admin-pgadmin
+SupplementaryGroups=harbor-tools
+EnvironmentFile=/etc/harbor/admin-pgadmin.env
+ExecStart=/opt/harbor-pgadmin/bin/gunicorn --workers 2 --bind unix:/run/harbor-admin-pgadmin.sock --timeout 60 harbor_pgadmin:application
+Restart=on-failure
+StateDirectory=harbor-admin-pgadmin
+StateDirectoryMode=0700
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET
+IPAddressDeny=any
+IPAddressAllow=localhost
+CapabilityBoundingSet=
+UMask=0077
+MemoryMax=1G
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

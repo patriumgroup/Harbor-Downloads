@@ -1,0 +1,39 @@
+[Unit]
+Description=Harbor native owner terminal broker
+After=harbor-agent.service
+Wants=harbor-agent.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/harbor-terminal
+Restart=on-failure
+RestartSec=3
+RuntimeDirectory=harbor-terminal
+RuntimeDirectoryMode=0755
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=no
+ReadWritePaths=/home
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=yes
+LockPersonality=yes
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETUID CAP_SETGID CAP_KILL CAP_AUDIT_WRITE
+# Required for the native UID transition with NoNewPrivileges + RestrictSUIDSGID.
+# UID transitions clear this ambient capability before the tenant workload.
+AmbientCapabilities=CAP_SETUID
+SystemCallArchitectures=native
+MemoryMax=512M
+TasksMax=128
+LimitNOFILE=256
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

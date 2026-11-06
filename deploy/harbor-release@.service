@@ -1,0 +1,15 @@
+[Unit]
+Description=Harbor release operation %i
+After=network-online.target harbor-agent.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/python3 /usr/local/lib/harbor/release_manager.py %i
+TimeoutStartSec=1800
+UMask=0077
+NoNewPrivileges=no
+ProtectHome=yes
+PrivateTmp=no
+SystemCallArchitectures=native

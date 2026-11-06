@@ -1,0 +1,12 @@
+[Unit]
+Description=Harbor private DNS control socket
+
+[Socket]
+ListenStream=/run/harbor-dns.sock
+SocketMode=0600
+SocketUser=root
+SocketGroup=root
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target

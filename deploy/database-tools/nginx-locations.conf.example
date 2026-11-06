@@ -1,0 +1,124 @@
+# Include within Harbor's existing HTTPS server block, before location /.
+# The setup script generates a root-only secret header include. Never expose
+# /etc/harbor or the pgAdmin listener through a second unprotected route.
+# These locations use the harbor_tools budget from nginx-http.conf so a
+# database tool's normal asset and AJAX requests do not exhaust the panel's
+# tighter general request budget. Keep auth_request on every tool route.
+location = /_harbor_tool_auth {
+    limit_req zone=harbor_tools burst=120 nodelay;
+    internal;
+    proxy_pass http://harbor_gateway/api/tool-access?tool=phpmyadmin;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Host panel.example.com;
+    proxy_set_header Cookie $http_cookie;
+    include /etc/harbor/nginx-proxy-secret.conf;
+}
+location /tools/phpmyadmin/ {
+    limit_req zone=harbor_tools burst=120 nodelay;
+    client_max_body_size 64m;
+    auth_request /_harbor_tool_auth;
+    auth_request_set $harbor_owner $upstream_http_x_harbor_owner;
+    auth_request_set $harbor_assertion $upstream_http_x_harbor_assertion;
+    alias /usr/share/phpmyadmin/;
+    index index.php;
+    location ~ ^/tools/phpmyadmin/(setup|test|tests|libraries|templates|vendor)/ { deny all; }
+    location ~ ^/tools/phpmyadmin/(?<harbor_pma_script>.+\.php)$ {
+        auth_request /_harbor_tool_auth;
+        auth_request_set $harbor_owner $upstream_http_x_harbor_owner;
+    auth_request_set $harbor_assertion $upstream_http_x_harbor_assertion;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /usr/share/phpmyadmin/$harbor_pma_script;
+        fastcgi_param SCRIPT_NAME /tools/phpmyadmin/$harbor_pma_script;
+        fastcgi_param HTTPS on;
+        fastcgi_param HARBOR_OWNER $harbor_owner;
+        fastcgi_param HARBOR_ASSERTION $harbor_assertion;
+        fastcgi_pass unix:/run/php/harbor-phpmyadmin.sock;
+        fastcgi_read_timeout 180s;
+    }
+}
+location = /_harbor_pgadmin_auth {
+    limit_req zone=harbor_tools burst=120 nodelay;
+    internal;
+    proxy_pass http://harbor_gateway/api/tool-access?tool=pgadmin;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Host panel.example.com;
+    proxy_set_header Cookie $http_cookie;
+    include /etc/harbor/nginx-proxy-secret.conf;
+}
+location /tools/pgadmin/ {
+    limit_req zone=harbor_tools burst=120 nodelay;
+    client_max_body_size 64m;
+    auth_request /_harbor_pgadmin_auth;
+    auth_request_set $harbor_owner $upstream_http_x_harbor_owner;
+    auth_request_set $harbor_assertion $upstream_http_x_harbor_assertion;
+    proxy_pass http://harbor_pgadmin/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Harbor-Owner $harbor_owner;
+    proxy_set_header X-Harbor-Assertion $harbor_assertion;
+    include /etc/harbor/pgadmin-proxy-header.conf;
+    proxy_set_header Remote-User "";
+    proxy_set_header X-Forwarded-User "";
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_read_timeout 60s;
+}
+location = /_harbor_admin_phpmyadmin_auth {
+    limit_req zone=harbor_tools burst=120 nodelay;
+    internal;
+    proxy_pass http://harbor_gateway/api/tool-access?tool=admin-phpmyadmin;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Host panel.example.com;
+    proxy_set_header Cookie $http_cookie;
+    include /etc/harbor/nginx-proxy-secret.conf;
+}
+location /tools/admin/phpmyadmin/ {
+    limit_req zone=harbor_tools burst=120 nodelay;
+    client_max_body_size 64m;
+    auth_request /_harbor_admin_phpmyadmin_auth;
+    auth_request_set $harbor_admin_owner $upstream_http_x_harbor_owner;
+    auth_request_set $harbor_admin_assertion $upstream_http_x_harbor_assertion;
+    alias /usr/share/phpmyadmin/;
+    index index.php;
+    location ~ ^/tools/admin/phpmyadmin/(setup|test|tests|libraries|templates|vendor)/ { deny all; }
+    location ~ ^/tools/admin/phpmyadmin/(?<harbor_admin_pma_script>.+\.php)$ {
+        auth_request /_harbor_admin_phpmyadmin_auth;
+        auth_request_set $harbor_admin_owner $upstream_http_x_harbor_owner;
+        auth_request_set $harbor_admin_assertion $upstream_http_x_harbor_assertion;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /usr/share/phpmyadmin/$harbor_admin_pma_script;
+        fastcgi_param SCRIPT_NAME /tools/admin/phpmyadmin/$harbor_admin_pma_script;
+        fastcgi_param HTTPS on;
+        fastcgi_param HARBOR_OWNER $harbor_admin_owner;
+        fastcgi_param HARBOR_ASSERTION $harbor_admin_assertion;
+        fastcgi_pass unix:/run/php/harbor-admin-phpmyadmin.sock;
+        fastcgi_read_timeout 180s;
+    }
+}
+location = /_harbor_admin_pgadmin_auth {
+    limit_req zone=harbor_tools burst=120 nodelay;
+    internal;
+    proxy_pass http://harbor_gateway/api/tool-access?tool=admin-pgadmin;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Host panel.example.com;
+    proxy_set_header Cookie $http_cookie;
+    include /etc/harbor/nginx-proxy-secret.conf;
+}
+location /tools/admin/pgadmin/ {
+    limit_req zone=harbor_tools burst=120 nodelay;
+    client_max_body_size 64m;
+    auth_request /_harbor_admin_pgadmin_auth;
+    auth_request_set $harbor_admin_owner $upstream_http_x_harbor_owner;
+    auth_request_set $harbor_admin_assertion $upstream_http_x_harbor_assertion;
+    proxy_pass http://harbor_admin_pgadmin/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Harbor-Owner $harbor_admin_owner;
+    proxy_set_header X-Harbor-Assertion $harbor_admin_assertion;
+    include /etc/harbor/admin-pgadmin-proxy-header.conf;
+    proxy_set_header Remote-User "";
+    proxy_set_header X-Forwarded-User "";
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_read_timeout 60s;
+}

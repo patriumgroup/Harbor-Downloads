@@ -1,0 +1,44 @@
+# Dedicated Harbor mail host. configure.sh substitutes the three @...@ values.
+compatibility_level = 3.6
+myhostname = @HOSTNAME@
+myorigin = $myhostname
+mydestination = $myhostname, localhost, localhost.localdomain
+inet_interfaces = all
+inet_protocols = all
+mynetworks = 127.0.0.0/8 [::1]/128
+relay_domains =
+disable_vrfy_command = yes
+authorized_submit_users = root
+smtpd_helo_required = yes
+strict_rfc821_envelopes = yes
+smtpd_relay_restrictions = permit_sasl_authenticated, reject_unauth_destination
+smtpd_recipient_restrictions = reject_unlisted_recipient
+smtpd_reject_unlisted_recipient = yes
+virtual_alias_domains =
+virtual_alias_maps =
+virtual_mailbox_domains = texthash:/etc/harbor/mail/current/domains
+virtual_mailbox_maps = texthash:/etc/harbor/mail/current/recipients
+virtual_transport = lmtp:unix:private/harbor-lmtp
+smtpd_sasl_type = dovecot
+smtpd_sasl_path = private/harbor-auth
+smtpd_sasl_auth_enable = no
+smtpd_tls_cert_file = @CERTIFICATE@
+smtpd_tls_key_file = @PRIVATE_KEY@
+smtpd_tls_security_level = may
+smtpd_tls_auth_only = yes
+smtpd_tls_protocols = >=TLSv1.2
+smtpd_tls_mandatory_protocols = >=TLSv1.2
+smtp_tls_security_level = may
+smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
+smtp_tls_loglevel = 0
+message_size_limit = 26214400
+smtpd_timeout = 120s
+milter_protocol = 6
+milter_default_action = tempfail
+milter_mail_macros = i {mail_addr} {auth_type} {auth_authen} {client_addr} {helo_name}
+# The signing socket is used only by the authenticated submission services.
+smtpd_milters = unix:/run/harbor-filter/milter.sock
+non_smtpd_milters = unix:/run/harbor-filter/milter.sock
+# No permit_mynetworks relay exception: even local applications authenticate.
+
+virtual_alias_maps = texthash:/etc/harbor/mail/current/aliases

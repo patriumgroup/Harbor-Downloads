@@ -1,0 +1,43 @@
+[Unit]
+Description=Harbor unprivileged web gateway
+After=network.target harbor-agent.service harbor-terminal.service harbor-web.socket
+Wants=harbor-agent.service harbor-terminal.service
+Requires=harbor-web.socket
+
+[Service]
+Type=simple
+User=harbor
+Group=harbor
+EnvironmentFile=/etc/harbor/harbor.env
+ExecStart=/usr/local/bin/harbor-web
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+MemoryMax=256M
+TasksMax=24
+LimitNOFILE=256
+
+[Install]
+WantedBy=multi-user.target

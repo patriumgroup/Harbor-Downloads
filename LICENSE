@@ -1,0 +1,26 @@
+Harbor Commercial License Notice
+
+Copyright (c) 2026 Patrium Logistics LLC. All rights reserved.
+
+This notice covers original Harbor code, documentation, and compiled releases
+first distributed with this notice. Use, copying, modification, hosting,
+distribution, sublicensing, and sale require a separate written agreement with
+Patrium Logistics LLC. No rights are granted by the
+availability of source code or release downloads alone.
+
+This notice does not cover third-party components. Bundled third-party files
+retain their own copyright and license terms, identified in
+THIRD_PARTY_NOTICES.txt and the accompanying upstream license files. Packages
+installed separately through Ubuntu, a PHP package repository, or PyPI retain
+the licenses supplied by their respective publishers.
+
+This notice applies prospectively. Copies of earlier Harbor versions supplied
+under the MIT License remain subject to the terms under which those copies
+were distributed.
+
+UNLESS A SEPARATE WRITTEN AGREEMENT STATES OTHERWISE, THE SOFTWARE IS PROVIDED
+"AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, AND NONINFRINGEMENT. TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE
+COPYRIGHT HOLDERS ARE NOT LIABLE FOR CLAIMS OR DAMAGES ARISING FROM USE OF THE
+SOFTWARE.

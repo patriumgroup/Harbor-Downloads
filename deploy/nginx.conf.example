@@ -1,0 +1,45 @@
+# Replace every panel.example.com and certificate path before enabling.
+# This is a separate vhost; never overwrite the distribution's nginx.conf.
+# This file must be included once in the http context.
+include /etc/harbor/nginx-http.conf;
+server {
+    listen 80;
+    server_name panel.example.com;
+    return 301 https://panel.example.com$request_uri;
+}
+server {
+    listen 443 ssl;
+    server_name panel.example.com;
+    ssl_certificate /etc/letsencrypt/live/panel.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/panel.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    server_tokens off;
+    access_log /var/log/nginx/harbor-panel-access.json harbor_panel;
+    error_log /var/log/nginx/harbor-panel-error.log warn;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    client_max_body_size 4k;
+    client_body_timeout 5s;
+    include /etc/harbor/nginx-basic.conf;
+    location = /api/login {
+        limit_req zone=harbor_login burst=5 nodelay;
+        limit_req_status 429;
+        access_log /var/log/nginx/harbor-login.log harbor_login;
+        proxy_pass http://harbor_gateway;
+        proxy_http_version 1.1;
+        proxy_set_header Host panel.example.com;
+        proxy_set_header Connection "";
+        include /etc/harbor/nginx-proxy-secret.conf;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 60s;
+    }
+    location / {
+        proxy_pass http://harbor_gateway;
+        proxy_http_version 1.1;
+        proxy_set_header Host panel.example.com;
+        proxy_set_header Connection "";
+        include /etc/harbor/nginx-proxy-secret.conf;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 60s;
+        # Add an administrative IP allowlist here or use a trusted VPN.
+    }
+}
