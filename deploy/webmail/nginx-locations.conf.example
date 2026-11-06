@@ -1,0 +1,33 @@
+# Include in the existing panel TLS server. Substitute its exact hostname.
+# Requires the harbor_tools request budget in nginx-http.conf.
+location = /_harbor_roundcube_auth {
+    limit_req zone=harbor_tools burst=120 nodelay;
+    internal;
+    proxy_pass http://harbor_gateway/api/tool-access?tool=roundcube;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Host panel.example.com;
+    proxy_set_header Cookie $http_cookie;
+    include /etc/harbor/nginx-proxy-secret.conf;
+}
+location /tools/roundcube/ {
+    limit_req zone=harbor_tools burst=120 nodelay;
+    auth_request /_harbor_roundcube_auth;
+    alias /var/lib/roundcube/;
+    index index.php;
+    location ~ ^/tools/roundcube/(config|temp|logs|SQL|bin|installer|vendor|program/(lib|actions|include|steps|localization))/ { deny all; }
+    location = /tools/roundcube/index.php {
+        auth_request /_harbor_roundcube_auth;
+        auth_request_set $harbor_owner $upstream_http_x_harbor_owner;
+        auth_request_set $harbor_assertion $upstream_http_x_harbor_assertion;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /var/lib/roundcube/index.php;
+        fastcgi_param SCRIPT_NAME /tools/roundcube/index.php;
+        fastcgi_param HTTPS on;
+        fastcgi_param HARBOR_OWNER $harbor_owner;
+        fastcgi_param HARBOR_ASSERTION $harbor_assertion;
+        fastcgi_pass unix:/run/php/harbor-roundcube.sock;
+        client_max_body_size 25m;
+    }
+    location ~ \.php(?:/|$) { deny all; }
+}

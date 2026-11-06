@@ -1,0 +1,29 @@
+/var/log/harbor-sites/*.access.json /var/log/harbor-sites/*.error.log {
+    daily
+    rotate 14
+    maxsize 20M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    create 0640 root root
+    sharedscripts
+    postrotate
+        /usr/bin/systemctl reload nginx.service >/dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/harbor-sites/*.waf.json {
+    daily
+    rotate 14
+    maxsize 20M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    create 0640 www-data root
+    sharedscripts
+    postrotate
+        /usr/bin/systemctl reload nginx.service >/dev/null 2>&1 || true
+    endscript
+}

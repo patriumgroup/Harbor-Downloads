@@ -1,0 +1,14 @@
+Third-party components distributed with Harbor
+==============================================
+
+xterm.js (browser terminal JavaScript and CSS)
+License: MIT
+Files: web/vendor/xterm.js, web/vendor/xterm.css
+Full upstream copyright and license notice: web/vendor/XTERM-LICENSE.txt
+
+The xterm.js files are not covered by Harbor's proprietary license. Preserve
+their upstream notice when redistributing the runtime bundle.
+
+Harbor's installer can install separate Ubuntu, PHP PPA, and PyPI packages.
+Those packages are not included in this runtime archive and remain subject to
+their own licenses and package notices on the installed host.

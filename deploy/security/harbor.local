@@ -1,0 +1,13 @@
+[DEFAULT]
+bantime = 15m
+findtime = 10m
+maxretry = 5
+
+[harbor-panel]
+enabled = true
+filter = harbor-panel
+backend = polling
+logpath = /var/log/nginx/harbor-login.log
+port = http,https
+maxretry = 5
+findtime = 5m

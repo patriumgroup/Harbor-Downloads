@@ -1,0 +1,38 @@
+/var/log/nginx/harbor-panel-access.json /var/log/nginx/harbor-panel-error.log {
+    daily
+    rotate 14
+    maxsize 20M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    su root root
+    create 0640 root root
+    sharedscripts
+    postrotate
+        /usr/bin/systemctl reload nginx.service >/dev/null 2>&1 || true
+    endscript
+}
+
+/var/log/harbor-updates.jsonl {
+    daily
+    rotate 14
+    maxsize 20M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    su root root
+    create 0600 root root
+}
+
+/var/log/harbor-php/*/*.error.log {
+    daily
+    rotate 14
+    maxsize 20M
+    missingok
+    notifempty
+    compress
+    copytruncate
+    su root root
+}

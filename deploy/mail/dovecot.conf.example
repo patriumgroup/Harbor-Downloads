@@ -1,0 +1,71 @@
+# Ubuntu 24.04 / Dovecot 2.3 syntax. Not compatible with Dovecot 2.4.
+protocols = imap lmtp
+listen = *, ::
+ssl = required
+ssl_min_protocol = TLSv1.2
+ssl_cert = <@CERTIFICATE@
+ssl_key = <@PRIVATE_KEY@
+disable_plaintext_auth = yes
+auth_mechanisms = plain login
+auth_username_format = %Lu
+auth_cache_size = 0
+auth_verbose = yes
+auth_verbose_passwords = no
+auth_debug_passwords = no
+mail_location = maildir:~/Maildir
+first_valid_uid = @VMAIL_UID@
+last_valid_uid = @VMAIL_UID@
+mail_privileged_group =
+passdb {
+  driver = passwd-file
+  args = username_format=%u /etc/harbor/mail/current/passwd
+}
+userdb {
+  driver = passwd-file
+  args = username_format=%u /etc/harbor/mail/current/passwd
+}
+service imap-login {
+  inet_listener imap {
+    port = 0
+  }
+  inet_listener imaps {
+    port = 993
+    ssl = yes
+  }
+}
+service lmtp {
+  unix_listener /var/spool/postfix/private/harbor-lmtp {
+    mode = 0600
+    user = postfix
+    group = postfix
+  }
+}
+service auth {
+  unix_listener /var/spool/postfix/private/harbor-auth {
+    mode = 0600
+    user = postfix
+    group = postfix
+  }
+}
+namespace inbox {
+  inbox = yes
+  separator = /
+  mailbox Junk {
+    auto = subscribe
+    special_use = \Junk
+  }
+  mailbox Trash {
+    auto = subscribe
+    special_use = \Trash
+  }
+}
+protocol imap {
+  mail_max_userip_connections = 10
+}
+
+protocol lmtp {
+  mail_plugins = $mail_plugins sieve
+}
+plugin {
+  sieve_before = /etc/harbor/mail/harbor.sieve
+}

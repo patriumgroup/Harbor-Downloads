@@ -1,0 +1,31 @@
+[Unit]
+Description=Private Redis instance for Harbor spam filtering
+Before=rspamd.service
+
+[Service]
+Type=simple
+User=redis
+Group=_rspamd
+ExecStart=/usr/bin/redis-server /etc/harbor/mail/redis.conf
+Restart=on-failure
+RuntimeDirectory=harbor-spam-redis
+RuntimeDirectoryMode=0750
+StateDirectory=harbor-spam-redis
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+MemoryMax=256M
+TasksMax=16
+LimitNOFILE=128
+
+[Install]
+WantedBy=multi-user.target

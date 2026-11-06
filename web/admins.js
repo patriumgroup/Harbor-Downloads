@@ -1,0 +1,29 @@
+'use strict';
+state.adminAccounts={mode:'token',permissions:[],accounts:[]};
+async function loadAdmins(){if(!state.session?.superAdmin)return;state.adminAccounts=await api('admins');}
+function adminsView(){
+ const data=state.adminAccounts,mode=data.mode,all=data.permissions||[];
+ const rows=(data.accounts||[]).map(account=>`<article class="card detail-card" data-admin-row="${esc(account.id)}"><div class="card-header"><div><h2>${esc(account.id)} ${account.superAdmin?'· Super admin':''}</h2><span class="muted">${account.enabled?'Active':'Disabled'}</span></div></div>${account.superAdmin?'<p>Full access. This first account cannot be changed here.</p>':`<fieldset class="permission-grid"><legend>Permissions</legend>${all.map(permission=>`<label><input type="checkbox" value="${esc(permission)}" ${account.permissions.includes(permission)?'checked':''}>${esc(permission.replaceAll('.',' · ').replaceAll('_',' '))}</label>`).join('')}</fieldset><div class="dialog-actions"><button class="button primary" data-admin-action="permissions" data-admin-id="${esc(account.id)}">Save permissions</button><button class="button" data-admin-action="enabled" data-admin-id="${esc(account.id)}" data-admin-enabled="${account.enabled?'false':'true'}">${account.enabled?'Disable':'Enable'}</button><button class="button" data-admin-action="reset" data-admin-id="${esc(account.id)}">Reset ${mode==='token'?'token':'password'}</button><button class="button danger" data-admin-action="delete" data-admin-id="${esc(account.id)}">Delete</button></div>`}</article>`).join('');
+ return `<div class="detail-grid"><article class="card detail-card"><h2>Add administrator</h2><p>New accounts start without permissions. The first account remains the only super admin.</p><form id="admin-create-form"><label>Username<input name="id" required minlength="3" maxlength="32" pattern="[a-z][a-z0-9_-]{2,31}" autocomplete="off"></label>${mode==='password'?'<label>Password<input name="password" type="password" required minlength="16" maxlength="128" autocomplete="new-password"></label>':''}<p class="login-error" role="alert"></p><button class="button primary" type="submit">Create administrator</button></form></article><article class="card detail-card"><h2>Login method</h2>${facts([['Method',mode==='token'?'Individual tokens':'Username and password'],['First account','Super admin'],['Additional accounts','Selected permissions only']])}</article></div><div class="detail-grid">${rows}</div>`;
+}
+function showAdminToken(token){showDialog(`<h2 id="dialog-title">Administrator token</h2><p>Copy this token now. It will not be shown again.</p><textarea readonly rows="3" aria-label="New administrator token">${esc(token)}</textarea><div class="dialog-actions"><button class="button primary" data-action="close-dialog">Done</button></div>`);}
+document.addEventListener('submit',async event=>{
+ if(event.target.id!=='admin-create-form')return;event.preventDefault();const form=event.target,values=Object.fromEntries(new FormData(form)),button=$('button[type=submit]',form);button.disabled=true;
+ try{const result=await api('admins/change',{action:'create',id:values.id,...(values.password?{password:values.password}:{})});await loadAdmins();renderContent();if(result.token)showAdminToken(result.token);else toast('Administrator created.');}
+ catch(error){$('.login-error',form).textContent=error.message;button.disabled=false;}
+});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-admin-action]');if(!button||button.disabled)return;const action=button.dataset.adminAction,id=button.dataset.adminId,entry=state.adminAccounts.accounts.find(row=>row.id===id);if(!entry||entry.superAdmin)return;
+ if(action==='reset'||action==='delete'){
+  const message=action==='reset'?`Reset the ${state.adminAccounts.mode==='token'?'token':'password'} for ${id}? Existing sessions will be signed out.`:`Delete ${id}? This removes their access immediately.`;
+  showDialog(`<h2 id="dialog-title">${action==='reset'?'Reset credential':'Delete administrator'}</h2><p>${esc(message)}</p><form id="admin-confirm-form" data-admin-confirm="${action}" data-admin-id="${esc(id)}">${action==='reset'&&state.adminAccounts.mode==='password'?'<label>New password<input name="password" type="password" required minlength="16" maxlength="128" autocomplete="new-password"></label>':''}<p class="login-error" role="alert"></p><div class="dialog-actions"><button type="button" class="button" data-action="close-dialog">Cancel</button><button type="submit" class="button ${action==='delete'?'danger':'primary'}">Continue</button></div></form>`);return;
+ }
+ const request={action,id};if(action==='enabled')request.enabled=button.dataset.adminEnabled==='true';if(action==='permissions')request.permissions=[...button.closest('[data-admin-row]').querySelectorAll('input[type=checkbox]:checked')].map(input=>input.value);
+ button.disabled=true;try{await api('admins/change',request);await loadAdmins();renderContent();toast('Administrator updated.');}catch(error){toast(error.message,true);button.disabled=false;}
+});
+document.addEventListener('submit',async event=>{
+ if(event.target.id!=='admin-confirm-form')return;event.preventDefault();const form=event.target,action=form.dataset.adminConfirm,id=form.dataset.adminId,values=Object.fromEntries(new FormData(form));
+ try{const result=await api('admins/change',{action,id,...(values.password?{password:values.password}:{})});closeDialog();await loadAdmins();renderContent();if(result.token)showAdminToken(result.token);else toast('Administrator updated.');}
+ catch(error){$('.login-error',form).textContent=error.message;}
+});
+window.addEventListener('hashchange',async()=>{if(state.view==='admins'&&state.session?.superAdmin){try{await loadAdmins();renderContent();}catch(error){toast(error.message,true);}}});

@@ -1,0 +1,46 @@
+# Dedicated TLS vhost for this domain. Use a certificate covering both names.
+# Include the well-known location below in the primary website vhost as needed.
+server {
+    listen 443 ssl;
+    server_name autoconfig.example.com autodiscover.example.com;
+    ssl_certificate /etc/letsencrypt/live/discovery.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/discovery.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    server_tokens off;
+    client_max_body_size 4k;
+    client_body_timeout 5s;
+    # Uses the HTTP-context zone installed with the panel proxy template.
+    limit_req zone=harbor_requests burst=10 nodelay;
+    limit_req_status 429;
+    access_log off;
+    location = /mail/config-v1.1.xml {
+        limit_except GET { deny all; }
+        proxy_pass http://harbor_gateway/mail-discovery/autoconfig?domain=example.com;
+        proxy_set_header Host panel.example.com;
+        proxy_set_header Cookie "";
+        proxy_set_header Authorization "";
+        include /etc/harbor/nginx-proxy-secret.conf;
+        proxy_hide_header Set-Cookie;
+    }
+    location = /autodiscover/autodiscover.xml {
+        limit_except POST { deny all; }
+        proxy_pass http://harbor_gateway/mail-discovery/autodiscover?domain=example.com;
+        proxy_set_header Host panel.example.com;
+        proxy_set_header Cookie "";
+        proxy_set_header Authorization "";
+        include /etc/harbor/nginx-proxy-secret.conf;
+        proxy_hide_header Set-Cookie;
+    }
+    location / { return 404; }
+}
+# Primary website server block only:
+# location = /.well-known/autoconfig/mail/config-v1.1.xml {
+#     access_log off;
+#     limit_except GET { deny all; }
+#     proxy_pass http://harbor_gateway/mail-discovery/autoconfig?domain=example.com;
+#     proxy_set_header Host panel.example.com;
+#     proxy_set_header Cookie "";
+#     proxy_set_header Authorization "";
+#     include /etc/harbor/nginx-proxy-secret.conf;
+#     proxy_hide_header Set-Cookie;
+# }

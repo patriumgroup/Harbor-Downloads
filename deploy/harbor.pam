@@ -1,0 +1,4 @@
+# Native owner authentication; nologin shell does not disable panel access.
+# Managed-user eligibility is also checked against Harbor's root-owned registry.
+@include common-auth
+@include common-account
