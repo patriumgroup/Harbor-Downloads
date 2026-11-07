@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "tag": "v0.7.1-alpha.6",
-  "archiveSha256": "ed3a68d29ddf76635278b0962fe6c4cb012e2acff303fb351583a5f085145725",
-  "checksumSha256": "b30b48d2287ead411611315b6cdcf627a237629a666ea83b3b89555b67826419"
+  "tag": "v0.7.2-alpha.1",
+  "archiveSha256": "058bee2cda8c798874a573949d3f76a4a68aec93eb2bc20aa0223872e7ba5bd6",
+  "checksumSha256": "30fb799b6f1e07779f1d264f3f946b78f075727fa108ec835abd9eb5b85e3734"
 }
