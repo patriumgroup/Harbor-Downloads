@@ -62,9 +62,18 @@ fetch() {
     --proto '=https' --proto-redir '=https' \
     -H 'User-Agent: Harbor-Setup' "$1" -o "$2"
 }
-select_release() {
-  local selection
-  selection=$(python3 - releases.json <<'PY'
+fetch_release_metadata() {
+  if [[ ${HARBOR_SETUP_CHANNEL_ONLY:-0} != 1 ]] &&
+     fetch 'https://api.github.com/repos/patriumgroup/Harbor-Downloads/releases?per_page=30' releases.json; then return; fi
+  if [[ ${HARBOR_SETUP_CHANNEL_ONLY:-0} == 1 ]]; then
+    echo 'Using the public channel manifest for this verification.' >&2
+  else
+    echo 'GitHub release API unavailable; using the public channel manifest.' >&2
+  fi
+  fetch 'https://raw.githubusercontent.com/patriumgroup/Harbor-Downloads/main/channel.json' channel.json
+}
+select_release_from_api() {
+  python3 - releases.json <<'PY'
 import json,re,sys
 with open(sys.argv[1],encoding='utf-8') as stream:
     releases=json.load(stream)
@@ -84,7 +93,31 @@ for release in sorted(releases,key=lambda item:item.get('published_at') or '',re
 else:
     raise SystemExit('No complete Ubuntu 24.04 amd64 public release is available')
 PY
-  ) || return
+}
+select_release_from_channel() {
+  python3 - channel.json <<'PY'
+import json,re,sys
+with open(sys.argv[1],encoding='utf-8') as stream:
+    channel=json.load(stream)
+if not isinstance(channel,dict) or channel.get('version')!=1:
+    raise SystemExit('Invalid public release channel')
+tag=channel.get('tag','')
+archive=channel.get('archiveSha256','')
+checksum=channel.get('checksumSha256','')
+if (not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+(?:-(?:alpha|beta)\.[0-9]+)?',tag) or
+    not re.fullmatch(r'[0-9a-f]{64}',archive) or not re.fullmatch(r'[0-9a-f]{64}',checksum)):
+    raise SystemExit('Invalid public release channel')
+print(tag,archive,checksum)
+PY
+}
+select_release() {
+  local selection=''
+  if [[ -f releases.json ]]; then selection=$(select_release_from_api) || selection=''; fi
+  if [[ -z ${selection} ]]; then
+    echo 'Using the public channel manifest for release selection.' >&2
+    [[ -f channel.json ]] || fetch 'https://raw.githubusercontent.com/patriumgroup/Harbor-Downloads/main/channel.json' channel.json || return
+    selection=$(select_release_from_channel) || return
+  fi
   read -r release_tag asset_archive_digest asset_checksum_digest <<<"${selection}"
   printf 'Selected %s\n' "${release_tag}"
 }
@@ -137,8 +170,7 @@ echo 'Harbor setup · Ubuntu 24.04 amd64'
 echo "Root-only setup log: ${setup_log}"
 stage 'Refresh Ubuntu package lists' apt-get update
 stage 'Install download and verification tools' apt-get install -y --no-install-recommends ca-certificates curl python3
-stage 'Find the newest complete public release' fetch \
-  'https://api.github.com/repos/patriumgroup/Harbor-Downloads/releases?per_page=30' releases.json
+stage 'Find the newest complete public release' fetch_release_metadata
 stage 'Select the Ubuntu release' select_release
 stage 'Download release archive and checksum' download_release
 stage 'Verify and unpack the release' verify_and_extract
