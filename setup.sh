@@ -27,9 +27,10 @@ else
   }
 fi
 source /etc/os-release
-[[ ${ID} == ubuntu && ${VERSION_ID} == 24.04 && $(dpkg --print-architecture) == amd64 ]] || {
-  echo 'Harbor setup supports Ubuntu 24.04 LTS amd64 only.' >&2; exit 1;
+[[ ${ID} == ubuntu && ( ${VERSION_ID} == 26.04 || ${VERSION_ID} == 24.04 ) && $(dpkg --print-architecture) == amd64 ]] || {
+  echo 'Harbor setup supports Ubuntu 26.04 LTS amd64 and legacy Ubuntu 24.04 amd64 hosts.' >&2; exit 1;
 }
+platform="ubuntu${VERSION_ID}-amd64"
 
 export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l
 exec 9>/run/harbor-setup.lock
@@ -88,17 +89,18 @@ fetch_release_metadata() {
   fetch 'https://raw.githubusercontent.com/patriumgroup/Harbor-Downloads/main/channel.json' channel.json
 }
 select_release_from_api() {
-  python3 - releases.json <<'PY'
+  python3 - releases.json "${platform}" <<'PY'
 import json,re,sys
 with open(sys.argv[1],encoding='utf-8') as stream:
     releases=json.load(stream)
+platform=sys.argv[2]
 if not isinstance(releases,list):
     raise SystemExit('Unexpected public release response')
 for release in sorted(releases,key=lambda item:item.get('published_at') or '',reverse=True):
     tag=release.get('tag_name','')
     if release.get('draft') or not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+(?:-(?:alpha|beta)\.[0-9]+)?',tag):
         continue
-    archive=f'harbor-{tag}-ubuntu24.04-amd64.tar.gz'
+    archive=f'harbor-{tag}-{platform}.tar.gz'
     assets={asset.get('name'):asset for asset in release.get('assets',[])}
     required=(archive,archive+'.sha256')
     if all(name in assets and assets[name].get('size',0)>0 and assets[name].get('state')=='uploaded' and
@@ -106,16 +108,23 @@ for release in sorted(releases,key=lambda item:item.get('published_at') or '',re
         print(tag,assets[archive]['digest'][7:],assets[archive+'.sha256']['digest'][7:])
         break
 else:
-    raise SystemExit('No complete Ubuntu 24.04 amd64 public release is available')
+    raise SystemExit(f'No complete {platform} public release is available')
 PY
 }
 select_release_from_channel() {
-  python3 - channel.json <<'PY'
+  python3 - channel.json "${platform}" <<'PY'
 import json,re,sys
 with open(sys.argv[1],encoding='utf-8') as stream:
     channel=json.load(stream)
-if not isinstance(channel,dict) or channel.get('version')!=1:
+platform=sys.argv[2]
+if not isinstance(channel,dict):
     raise SystemExit('Invalid public release channel')
+if channel.get('version')==2:
+    channel=channel.get('platforms',{}).get(platform,{})
+elif channel.get('version')==1 and platform=='ubuntu24.04-amd64':
+    pass
+else:
+    raise SystemExit('No channel entry for this Ubuntu platform')
 tag=channel.get('tag','')
 archive=channel.get('archiveSha256','')
 checksum=channel.get('checksumSha256','')
@@ -137,7 +146,7 @@ select_release() {
   printf 'Selected %s\n' "${release_tag}"
 }
 download_release() {
-  archive="harbor-${release_tag}-ubuntu24.04-amd64.tar.gz"
+  archive="harbor-${release_tag}-${platform}.tar.gz"
   local base="https://github.com/patriumgroup/Harbor-Downloads/releases/download/${release_tag}"
   fetch "${base}/${archive}" "${archive}" || return
   fetch "${base}/${archive}.sha256" "${archive}.sha256"
@@ -159,10 +168,10 @@ PY
      ${actual_checksum%% *} == "${asset_checksum_digest}" ]] || {
     echo 'Downloaded assets do not match the release metadata and checksum.' >&2; return 1;
   }
-  python3 - "${archive}" "${release_tag}" <<'PY'
+  python3 - "${archive}" "${release_tag}" "${platform}" <<'PY'
 import pathlib,sys,tarfile
-archive,tag=sys.argv[1:]
-root=f'harbor-{tag}-ubuntu24.04-amd64'
+archive,tag,platform=sys.argv[1:]
+root=f'harbor-{tag}-{platform}'
 with tarfile.open(archive,'r:gz') as bundle:
     members=bundle.getmembers()
     if not members or len(members)>512 or sum(item.size for item in members)>100*1024*1024:
@@ -176,12 +185,12 @@ with tarfile.open(archive,'r:gz') as bundle:
     bundle.extractall('.',filter='data')
 PY
   [[ $? == 0 ]] || return
-  release_dir="${workdir}/harbor-${release_tag}-ubuntu24.04-amd64"
+  release_dir="${workdir}/harbor-${release_tag}-${platform}"
   python3 "${release_dir}/deploy/release_bundle.py" verify "${archive}" || return
   bash -n "${release_dir}/deploy/install-release.sh"
 }
 
-echo 'Harbor setup · Ubuntu 24.04 amd64'
+echo "Harbor setup · ${platform}"
 if ${upgrade}; then echo 'Console upgrade mode'; fi
 echo "Root-only setup log: ${setup_log}"
 stage 'Refresh Ubuntu package lists' apt-get update

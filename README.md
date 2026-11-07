@@ -1,10 +1,18 @@
+<div align="center">
+
+<img src="assets/harbor-mark.svg" width="88" height="88" alt="Harbor lighthouse logo">
+
 # Harbor downloads
+
+</div>
 
 Public downloads of compiled Harbor releases from Patrium Logistics LLC. The application source repository is private. Each release contains the Ubuntu binaries, runtime assets, and scripts needed to install, update, or uninstall Harbor, plus a separate SHA-256 checksum file. No installation secrets are packaged; they are generated on the host.
 
-**Current status:** supervised technical alpha. Harbor is not ready for public multi-tenant production hosting. The current archive supports **Ubuntu 24.04 LTS amd64 only**; Ubuntu 26.04 is not supported yet.
+**Current status:** supervised technical alpha. Harbor is not ready for public multi-tenant production hosting. The newest release targets **Ubuntu 26.04 LTS amd64**. The last 24.04 archive remains available for legacy test hosts. Choose the asset matching the installed operating system; a Harbor application update does not upgrade Ubuntu itself.
 
-[Download the current technical alpha](https://github.com/patriumgroup/Harbor-Downloads/releases/tag/v0.7.2-alpha.7) · [All releases](https://github.com/patriumgroup/Harbor-Downloads/releases)
+[Download the Ubuntu 26.04 technical alpha](https://github.com/patriumgroup/Harbor-Downloads/releases/tag/v0.8.0-alpha.1) · [Legacy Ubuntu 24.04 release](https://github.com/patriumgroup/Harbor-Downloads/releases/tag/v0.7.2-alpha.7) · [All releases](https://github.com/patriumgroup/Harbor-Downloads/releases)
+
+`v0.8.0-alpha.1` moves the native build and installer to Ubuntu 26.04. It uses Ubuntu PHP 8.5, ports the mail template to Dovecot 2.4, and supports pgAdmin's Python 3.14 environment. The 24.04 PHP PPA is not added on 26.04; other PHP versions appear only when an administrator supplies a compatible APT source. Panel updates now use public compiled releases without a repository token. Release asset digests and owner-session limits were hardened. Native CI passed a fresh guided install, update, optional database-tool setup, mail configuration, and Roundcube package setup. Live third-party SSO, mail delivery, ACME issuance, and multi-tenant security acceptance remain open.
 
 `v0.7.2-alpha.3` fixes network address inspection and adds confirmed database, domain and site-owner removal, a managed NGINX rebuild action, automatic `www` website aliases, and HTTP server signature suppression. Site files and logs remain available after domain removal; owner home files are archived in a root-only directory. This release has passed disposable Ubuntu 24.04 installation tests; deploy it on a test host before accepting customer traffic.
 
@@ -16,7 +24,7 @@ Public downloads of compiled Harbor releases from Patrium Logistics LLC. The app
 
 `v0.7.2-alpha.7` adds Ubuntu Pure-FTPd as a Harbor-managed explicit FTPS service for native site owners. TLS is required for both login and transfers; the package's default FTP listener is masked. The installer and panel show SFTP on port 2222 and FTPS on port 21 with passive ports 50000–50099. Open those ports in the provider firewall. Cloudflare proxied records do not carry FTP or SSH; use a DNS-only hostname for file transfer.
 
-For a fresh Ubuntu 24.04 amd64 host, run this one line in an interactive terminal:
+For a fresh Ubuntu 26.04 amd64 host, run this one line in an interactive terminal:
 
 ```sh
 wget -qO harbor-setup.sh https://raw.githubusercontent.com/patriumgroup/Harbor-Downloads/main/setup.sh && sudo bash harbor-setup.sh
@@ -30,6 +38,6 @@ To **upgrade an existing Harbor installation** from a root console, run:
 wget -qO harbor-setup.sh https://raw.githubusercontent.com/patriumgroup/Harbor-Downloads/main/setup.sh && bash harbor-setup.sh --upgrade
 ```
 
-This uses the public release without a GitHub token or panel access. It verifies the release, refuses a downgrade, and creates a root-only backup before installation. Progress appears in the console and details are saved in `/var/log/harbor/upgrade-*.log`. Keep the console open until the command finishes. Harbor currently supports Ubuntu 24.04 LTS amd64 only.
+This uses the public release without a GitHub token or panel access. It verifies the release, refuses a downgrade, and creates a root-only backup before installation. Progress appears in the console and details are saved in `/var/log/harbor/upgrade-*.log`. Keep the console open until the command finishes. The setup script selects a release matching Ubuntu 26.04 or a supported legacy Ubuntu 24.04 installation; it does not perform an OS migration.
 
 For product information and commercial inquiries, visit [Patrium Logistics LLC](https://www.patrium.net/).
