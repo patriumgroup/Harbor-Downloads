@@ -1,22 +1,31 @@
 #!/usr/bin/env bash
-# Public entry point for a fresh Harbor installation.
+# Public entry point for Harbor installation and console upgrades.
 set -euo pipefail
 umask 077
 
 verify_only=false
-if [[ $# == 1 && $1 == --verify-only ]]; then
-  verify_only=true
-elif [[ $# != 0 ]]; then
-  echo 'Usage: bash setup.sh [--verify-only]' >&2
-  exit 2
-fi
+upgrade=false
+for option in "$@"; do
+  case ${option} in
+    --verify-only) verify_only=true ;;
+    --upgrade) upgrade=true ;;
+    *) echo 'Usage: bash setup.sh [--upgrade] [--verify-only]' >&2; exit 2 ;;
+  esac
+done
 [[ ${EUID} == 0 ]] || { echo 'Run Harbor setup as root.' >&2; exit 1; }
 if ! ${verify_only}; then
   [[ -t 0 && -t 1 ]] || { echo 'Run Harbor setup in an interactive terminal.' >&2; exit 1; }
 fi
-[[ ! -e /etc/harbor/harbor.env && ! -e /var/lib/harbor/admins.json ]] || {
-  echo 'An existing or partial Harbor installation was found. Review its log before retrying.' >&2; exit 1;
-}
+if ${upgrade}; then
+  [[ -f /etc/harbor/harbor.env && ! -L /etc/harbor/harbor.env &&
+     -f /var/lib/harbor/admins.json && ! -L /var/lib/harbor/admins.json ]] || {
+    echo 'No complete Harbor installation was found. Use setup without --upgrade for a fresh host.' >&2; exit 1;
+  }
+else
+  [[ ! -e /etc/harbor/harbor.env && ! -e /var/lib/harbor/admins.json ]] || {
+    echo 'An existing or partial Harbor installation was found. Use --upgrade only for a complete installation.' >&2; exit 1;
+  }
+fi
 source /etc/os-release
 [[ ${ID} == ubuntu && ${VERSION_ID} == 24.04 && $(dpkg --print-architecture) == amd64 ]] || {
   echo 'Harbor setup supports Ubuntu 24.04 LTS amd64 only.' >&2; exit 1;
@@ -28,14 +37,20 @@ flock -n 9 || { echo 'Another Harbor setup is running.' >&2; exit 1; }
 [[ ! -L /var/log/harbor ]] || { echo 'Unsafe setup log directory.' >&2; exit 1; }
 install -d -o root -g root -m 0700 /var/log/harbor
 [[ $(stat -c '%u:%a' /var/log/harbor) == 0:700 ]] || { echo 'Unsafe setup log directory.' >&2; exit 1; }
-setup_log=$(mktemp "/var/log/harbor/setup-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX.log")
+log_type=setup
+if ${upgrade}; then log_type=upgrade; fi
+setup_log=$(mktemp "/var/log/harbor/${log_type}-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX.log")
 workdir=$(mktemp -d /var/tmp/harbor-setup.XXXXXXXX)
 cleanup() {
   local status=$?
   trap - EXIT
   if [[ ${workdir} == /var/tmp/harbor-setup.* ]]; then rm -rf -- "${workdir}" || true; fi
-  printf '%s Setup exit status: %s\n' "$(date -u +%FT%TZ)" "${status}" >>"${setup_log}"
-  if [[ ${status} != 0 ]]; then printf 'Setup stopped. Root-only log: %s\n' "${setup_log}" >&2; fi
+  if ${upgrade}; then
+    printf '%s Upgrade exit status: %s\n' "$(date -u +%FT%TZ)" "${status}" >>"${setup_log}"
+  else
+    printf '%s Setup exit status: %s\n' "$(date -u +%FT%TZ)" "${status}" >>"${setup_log}"
+  fi
+  if [[ ${status} != 0 ]]; then printf '%s stopped. Root-only log: %s\n' "${log_type}" "${setup_log}" >&2; fi
   exit "${status}"
 }
 trap cleanup EXIT
@@ -167,6 +182,7 @@ PY
 }
 
 echo 'Harbor setup · Ubuntu 24.04 amd64'
+if ${upgrade}; then echo 'Console upgrade mode'; fi
 echo "Root-only setup log: ${setup_log}"
 stage 'Refresh Ubuntu package lists' apt-get update
 stage 'Install download and verification tools' apt-get install -y --no-install-recommends ca-certificates curl python3
@@ -175,12 +191,56 @@ stage 'Select the Ubuntu release' select_release
 stage 'Download release archive and checksum' download_release
 stage 'Verify and unpack the release' verify_and_extract
 if ${verify_only}; then
-  printf 'Verified public release %s. Setup log: %s\n' "${release_tag}" "${setup_log}"
+  printf 'Verified public release %s. Log: %s\n' "${release_tag}" "${setup_log}"
   exit 0
 fi
 
 step=7
-printf '[7/7] Start guided Harbor installation...\n'
-printf '%s [7/7] Start guided Harbor installation\n' "$(date -u +%FT%TZ)" >>"${setup_log}"
-export HARBOR_BOOTSTRAP_LOG="${setup_log}"
-bash "${release_dir}/deploy/install-release.sh" "${archive}" "${digest}"
+if ${upgrade}; then
+  version_result=$(python3 - "${release_tag}" <<'PY'
+import json,os,pathlib,re,stat,sys
+path=pathlib.Path('/usr/local/share/harbor/release.json')
+try:
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC)
+except FileNotFoundError:
+    print('unknown')
+    sys.exit(0)
+try:
+    info=os.fstat(fd)
+    if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_nlink!=1 or info.st_mode & 0o022 or info.st_size>4096:
+        raise SystemExit('Unsafe installed release metadata')
+    current=json.loads(os.read(fd,4097)).get('tag','')
+finally:
+    os.close(fd)
+pattern=r'v(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta)\.(\d+))?'
+def version(value):
+    match=re.fullmatch(pattern,value)
+    if not match:return None
+    major,minor,patch,stage,number=match.groups()
+    return int(major),int(minor),int(patch),{'alpha':0,'beta':1,None:2}[stage],int(number or 0)
+installed=version(current)
+selected=version(sys.argv[1])
+if selected is None:raise SystemExit('Invalid selected release tag')
+print('unknown' if installed is None else 'same' if installed==selected else 'older' if installed>selected else 'newer')
+PY
+  )
+  case ${version_result} in
+    same) printf 'Harbor %s is already installed.\n' "${release_tag}"; exit 0 ;;
+    older) printf 'Installed Harbor is newer than %s; refusing to downgrade.\n' "${release_tag}" >&2; exit 1 ;;
+    unknown|newer) ;;
+    *) printf 'Cannot compare installed Harbor version.\n' >&2; exit 1 ;;
+  esac
+  printf '[7/7] Back up and upgrade Harbor to %s...\n' "${release_tag}"
+  printf '%s [7/7] Back up and upgrade Harbor to %s\n' "$(date -u +%FT%TZ)" "${release_tag}" >>"${setup_log}"
+  if bash "${release_dir}/deploy/update.sh" "${archive}" "${digest}" >>"${setup_log}" 2>&1; then
+    printf 'Harbor upgraded to %s. Root-only log: %s\n' "${release_tag}" "${setup_log}"
+  else
+    printf 'Upgrade failed. Review %s and the backup path recorded there.\n' "${setup_log}" >&2
+    exit 1
+  fi
+else
+  printf '[7/7] Start guided Harbor installation...\n'
+  printf '%s [7/7] Start guided Harbor installation\n' "$(date -u +%FT%TZ)" >>"${setup_log}"
+  export HARBOR_BOOTSTRAP_LOG="${setup_log}"
+  bash "${release_dir}/deploy/install-release.sh" "${archive}" "${digest}"
+fi
